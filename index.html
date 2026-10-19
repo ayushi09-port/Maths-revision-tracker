@@ -105,8 +105,15 @@ document.getElementById("sOk").textContent=ok;
 document.getElementById("sNew").textContent=nw;
 let v=rows.filter(r=>fCl.value==="all"||r.t.c==fCl.value);
 const so=document.getElementById("fSort").value;
-if(so==="due")v.sort((a,b)=>(b.d===null?-999:b.d-b.k)-(a.d===null?-999:a.d-a.k)||a.t.i-b.t.i);
-else if(so==="least")v.sort((a,b)=>a.s.n-b.s.n||a.t.i-b.t.i);
+if(so==="due") {
+    v.sort((a,b) => {
+        let da = a.d === null ? -999 : a.d - a.k;
+        let db = b.d === null ? -999 : b.d - b.k;
+        return db - da || a.t.i - b.t.i;
+    });
+} else if(so==="least") {
+    v.sort((a,b) => a.s.n - b.s.n || a.t.i - b.t.i);
+}
 document.getElementById("list").innerHTML=v.map(r=>{
 const {t,s,d,k}=r;let cls="none",txt="Not studied yet";
 if(d!==null){txt=d===0?"Today":d+(d===1?" day ago":" days ago");cls=d>=k?"bad":(d>=k-2?"warn":"ok")}
