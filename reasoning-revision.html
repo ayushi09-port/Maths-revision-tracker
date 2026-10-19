@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Reasoning Revision Tracker</title>
+<style>
+:root{--bg:#020617;--card:#0f172a;--line:#1e293b;--tx:#f1f5f9;--mut:#94a3b8;--ac:#d946ef;--ok:#34d399;--warn:#fbbf24;--bad:#fb7185;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:light){:root:not([data-theme="dark"]){--bg:#f1f5f9;--card:#fff;--line:#e2e8f0;--tx:#0f172a;--mut:#64748b;--ok:#059669;--warn:#b45309;--bad:#e11d48}}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-tap-highlight-color:transparent}
+main{max-width:640px;margin:0 auto;padding:14px}
+h1{font-size:18px;margin:0 0 2px}
+.sub{color:var(--mut);font-size:12px;margin-bottom:12px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;text-align:center}
+.stat b{display:block;font-size:22px}.stat span{font-size:10px;color:var(--mut);text-transform:uppercase}
+.bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
+select,input[type=date],button{font:inherit;font-size:13px;background:var(--card);color:var(--tx);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+select{flex:1;min-width:120px}
+button{cursor:pointer}button:active{transform:scale(.96)}
+.th{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mut);width:100%}
+.item{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:10px}
+.top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.name{font-weight:700;font-size:15px}.cl{font-size:11px;color:var(--mut)}
+.badge{font-size:12px;font-weight:700;padding:4px 10px;border-radius:99px;white-space:nowrap;border:1px solid}
+.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}.none{color:var(--mut)}
+.row{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}
+.cnt{display:flex;align-items:center;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.cnt button{border:0;border-radius:0;width:36px;padding:8px 0;font-weight:700}
+.cnt span{min-width:34px;text-align:center;font-weight:700}
+.lbl{font-size:11px;color:var(--mut)}
+.go{background:var(--ac);color:#fff;border-color:var(--ac);font-weight:700;margin-left:auto}
+.foot{text-align:center;margin:18px 0}
+.foot button{font-size:12px;color:var(--mut)}
+</style>
+</head>
+<body>
+<main>
+<h1>Reasoning Revision Tracker</h1>
+<div class="sub">Tap "Completed today" when you finish a topic. Then tap "Revised today" each time you revise it; the gap grows automatically (1, 3, 7, 14, 30 days).</div>
+<div class="stats">
+<div class="stat"><b id="sDue" class="bad">0</b><span>Due now</span></div>
+<div class="stat"><b id="sOk" class="ok">0</b><span>On track</span></div>
+<div class="stat"><b id="sNew" class="none">0</b><span>Not started</span></div>
+</div>
+<div class="bar">
+<select id="fCl"></select>
+<select id="fSort">
+<option value="due">Most overdue first</option>
+<option value="course">Syllabus order</option>
+<option value="least">Least revised first</option>
+</select>
+<div class="th" style="flex-wrap:wrap">Auto schedule (days until next revision, by step):</div>
+<div class="th" id="sch"></div>
+</div>
+<div id="list"></div>
+<div class="foot">
+<button onclick="resetAll()">Reset all revision data</button>
+<br><br>
+<a href="index.html" style="color:var(--ac); text-decoration:none; font-size:13px;">← Go to Maths Revision / Dashboard</a>
+</div>
+</main>
+<script>
+const CL=["Verbal Reasoning","Analytical & Logical Reasoning","Non-Verbal Reasoning"];
+const TOP=[
+[0,"Alphabet"],[0,"Calendar"],[0,"Dice"],[0,"Direction"],[0,"Cuboid and Cube"],[0,"Ranking Arrangement"],[0,"Seating Arrangement"],[0,"Blood Relation"],[0,"Alphabet Series"],[0,"Letter Series"],[0,"Number Series"],[0,"Missing Number"],[0,"Alphanumeric Symbol Series"],[0,"Coding Decoding"],[0,"Analogy"],[0,"Clock"],[0,"Similarity"],[0,"Odd One Out"],[0,"Mathematical Operation"],[0,"Venn Diagram"],[0,"Arrangement of Words"],[0,"Puzzle"],
+[1,"Input and Output"],[1,"Syllogism"],[1,"Coding Inequality"],[1,"Data Sufficiency"],[1,"Statement Arrangement"],[1,"Statement Argument"],[1,"Statement Assumption"],[1,"Course of Action"],[1,"Cause and Effect"],[1,"Decision Making"],
+[2,"Counting Figure"],[2,"Mirror and Water Image"],[2,"Paper Cutting & Folding"],[2,"Embedded Figures"],[2,"Figure Completion"],[2,"Classification of Figure"],[2,"Dot Situation"],[2,"Figure Series"]
+].map((t,i)=>({id:"r"+i,i:i,c:t[0],n:t[1]}));
+
+const KEY="reasoning_revision_v1";
+let S={sched:[1,3,7,14,30],t:{}};
+try{const r=localStorage.getItem(KEY);if(r)S=Object.assign(S,JSON.parse(r))}catch(e){}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function iso(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
+function get(id){return S.t[id]||(S.t[id]={n:0,d:""})}
+function days(d){if(!d)return null;const p=d.split("-").map(Number);const a=new Date(p[0],p[1]-1,p[2]);const n=new Date();const b=new Date(n.getFullYear(),n.getMonth(),n.getDate());return Math.round((b-a)/864e5)}
+function setS(i,v){S.sched[i]=Math.min(120,Math.max(1,parseInt(v)||1));save();render()}
+function autoK(id){delete get(id).k;save();render()}
+function iv(t){return t.k||S.sched[Math.min(t.n,S.sched.length-1)]}
+function setK(id,x){const t=get(id);t.k=Math.min(60,Math.max(1,iv(t)+x));save();render()}
+function adj(id,x){const t=get(id);t.n=Math.max(0,t.n+x);save();render()}
+function today(id){const t=get(id);if(t.d)t.n++;t.d=iso(new Date());save();render()}
+function setDate(id,v){get(id).d=v;save();render()}
+function resetAll(){if(confirm("Clear all revision counts and dates?")){S.t={};save();render()}}
+
+const fCl=document.getElementById("fCl");
+fCl.innerHTML='<option value="all">All categories</option>'+CL.map((c,i)=>`<option value="${i}">${i+1}. ${c}</option>`).join("");
+fCl.onchange=render;document.getElementById("fSort").onchange=render;
+
+function render(){
+document.getElementById("sch").innerHTML=S.sched.map((v,i)=>`<span>${i===0?"Studied":i===4?"4+ revisions":(i)+" rev"}</span><input type="number" min="1" max="120" value="${v}" onchange="setS(${i},this.value)" style="width:52px;padding:6px 4px;text-align:center;font:inherit;font-size:13px;background:var(--card);color:var(--tx);border:1px solid var(--line);border-radius:8px">`).join(" → ");
+let due=0,ok=0,nw=0;
+const rows=TOP.map(t=>{const s=get(t.id);const d=days(s.d);
+if(d===null)nw++;else if(d>=iv(s))due++;else ok++;
+return {t,s,d,k:iv(s)}});
+document.getElementById("sDue").textContent=due;
+document.getElementById("sOk").textContent=ok;
+document.getElementById("sNew").textContent=nw;
+let v=rows.filter(r=>fCl.value==="all"||r.t.c==fCl.value);
+const so=document.getElementById("fSort").value;
+if(so==="due")v.sort((a,b)=>(b.d===null?-999:b.d-b.k)-(a.d===null?-999:a.d-b.k)||a.t.i-b.t.i);
+else if(so==="least")v.sort((a,b)=>a.s.n-b.s.n||a.t.i-b.t.i);
+
+document.getElementById("list").innerHTML=v.map(r=>{
+const {t,s,d,k}=r;let cls="none",txt="Not studied yet";
+if(d!==null){txt=d===0?"Today":d+(d===1?" day ago":" days ago");cls=d>=k?"bad":(d>=k-2?"warn":"ok")}
+return `<div class="item"><div class="top"><div><div class="name">${t.n}</div><div class="cl">${CL[t.c]}</div></div>
+<span class="badge ${cls}">${txt}</span></div>
+<div class="row"><span class="lbl">Revised</span><div class="cnt"><button onclick="adj('${t.id}',-1)">−</button><span>${s.n}×</span><button onclick="adj('${t.id}',1)">+</button></div>
+<span class="lbl">Every</span><div class="cnt"><button onclick="setK('${t.id}',-1)">−</button><span>${k}d</span><button onclick="setK('${t.id}',1)">+</button></div>${s.k?`<button onclick="autoK('${t.id}')">Auto</button>`:`<span class="lbl">auto</span>`}
+<input type="date" value="${s.d}" max="${iso(new Date())}" onchange="setDate('${t.id}',this.value)" aria-label="Last revised date">
+<button class="go" onclick="today('${t.id}')">${s.d?"Revised today":"Completed today"}</button></div></div>`}).join("");
+}
+render();
+</script>
+</body>
+</html>
